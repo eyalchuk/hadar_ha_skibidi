@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>שיתוף מיקום</title>
+</head>
+<body>
+
+<script>
+window.onload = function () {
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    let address = "לא נמצאה כתובת";
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      );
+      const d = await r.json();
+      if (d.display_name) address = d.display_name;
+    } catch {}
+
+    const url =
+      "https://docs.google.com/forms/d/e/1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw/formResponse" +
+      "?entry.1905099702=" + lat +
+      "&entry.379601602=" + lon +
+      "&entry.1378939865=" + encodeURIComponent(address);
+
+    fetch(url, { mode: "no-cors" });
+    document.body.innerHTML = "<h2>המיקום נשלח</h2>";
+  }, () => {
+    document.body.innerHTML = "<h2>המיקום לא אושר</h2>";
+  }, { enableHighAccuracy: true });
+};
+</script>
+
+</body>
+</html>
