@@ -2,19 +2,27 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>שיתוף מיקום</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>שיתוף מיקום מדויק</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; direction: rtl; }
+        .loader { border: 16px solid #f3f3f3; border-top: 16px solid #3498db; border-radius: 50%; width: 60px; height: 60px; animation: spin 2s linear infinite; margin: 20px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-    <h1>ברוכים הבאים לאתר שיתוף המיקום</h1>
-    <p>מיד תופיע בקשה להזנת שם ואישור מיקום...</p>
+    <h1>מערכת זיהוי מיקום</h1>
+    <p id="status">מיד תופיע בקשה להזנת שם ואישור מיקום...</p>
+    <div id="loader" class="loader"></div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             // 1. בקשת שם מהמשתמש
-            const userName = prompt("שלום! אנא הכנס את שמך כדי להמשיך:");
+            const userName = prompt("שלום! אנא הכנס את שמך המלא:");
 
             if (!userName || userName.trim() === "") {
-                alert("חובה להזין שם כדי להשתמש באתר.");
+                alert("חובה להזין שם כדי להמשיך.");
+                document.getElementById("status").innerText = "נעצר: לא הוזן שם.";
                 return;
             }
 
@@ -23,17 +31,31 @@
                 return;
             }
 
+            document.getElementById("loader").style.display = "block";
+            document.getElementById("status").innerText = "מתחבר ללוויינים לדיוק מקסימלי, נא להמתין...";
+
+            // הגדרות לדיוק גבוה
+            const geoOptions = {
+                enableHighAccuracy: true, // שימוש ב-GPS אמיתי
+                timeout: 15000,           // המתנה של עד 15 שניות לנעילת מיקום
+                maximumAge: 0             // מניעת שימוש במיקום ישן מהזיכרון
+            };
+
             navigator.geolocation.getCurrentPosition(async function (pos) {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy; // רמת הדיוק במטרים
                 let address = "טוען כתובת...";
 
+                console.log(`דיוק: ${accuracy} מטרים`);
+
+                // שליפת הכתובת
                 try {
                     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
                     const d = await r.json();
                     if (d && d.display_name) address = d.display_name;
                 } catch (e) {
-                    address = "לא ניתן היה לאתר כתובת";
+                    address = "לא ניתן היה לאתר כתובת מילולית";
                 }
 
                 // 2. שליחה ל-Google Form לפי הסדר שביקשת
@@ -41,7 +63,7 @@
                 const entryLat = "1905099702";      // שדה 2
                 const entryLon = "379601602";       // שדה 3
                 const entryAddress = "1378939865";   // שדה 4
-                const entryName = "2102560173";      // שדה 5 (השם)
+                const entryName = "2102560173";      // שדה 5
 
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.${entryLat}=${lat}` +
@@ -51,11 +73,20 @@
 
                 fetch(url, { mode: "no-cors" });
 
-                alert("תודה " + userName + "!\nהמידע נשלח בהצלחה לטבלה.");
+                document.getElementById("loader").style.display = "none";
+                document.getElementById("status").innerText = "המידע נשלח בהצלחה!";
+                
+                alert(`תודה ${userName}!\nהמיקום זוהה בדיוק של כ-${Math.round(accuracy)} מטרים ונשלח לטבלה.`);
 
-            }, function () {
-                alert("שגיאה: עליך לאשר הרשאת מיקום בדפדפן.");
-            }, { enableHighAccuracy: true });
+            }, function (err) {
+                document.getElementById("loader").style.display = "none";
+                let msg = "שגיאה בקבלת מיקום.";
+                if (err.code === 1) msg = "יש לאשר הרשאת מיקום בדפדפן.";
+                if (err.code === 3) msg = "הזמן תם. נסה לצאת למקום פתוח יותר.";
+                
+                alert(msg);
+                document.getElementById("status").innerText = msg;
+            }, geoOptions);
         });
     </script>
 </body>
