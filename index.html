@@ -3,43 +3,38 @@
         const userName = prompt("שלום! אנא הכנס את שמך המלא:");
         if (!userName || userName.trim() === "") return;
 
-        document.getElementById("loader").style.display = "block";
-        document.getElementById("status").innerText = "מתביית על לוויינים לדיוק מירבי... (זה עשוי לקחת 5-10 שניות)";
+        document.getElementById("status").innerText = "מתביית על לוויינים... נא לא לסגור את הדף";
 
-        let sent = false; // מוודא שזה יישלח רק פעם אחת ברגע שהדיוק טוב
+        // פונקציה לשליחה
+        async function sendData(lat, lon, acc) {
+            let address = "טוען כתובת...";
+            try {
+                const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
+                const d = await r.json();
+                if (d && d.display_name) address = d.display_name;
+            } catch (e) {}
 
-        const watchID = navigator.geolocation.watchPosition(async function (pos) {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            const accuracy = pos.coords.accuracy;
+            const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
+            const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
+                `?entry.1905099702=${lat}` +
+                `&entry.379601602=${lon}` +
+                `&entry.1378939865=${encodeURIComponent(address)}` +
+                `&entry.2102560173=${encodeURIComponent(userName)}`;
 
-            // אם הדיוק טוב מ-30 מטרים או שעברו 10 שניות - תשלח
-            if (accuracy < 30 && !sent) {
-                sent = true;
-                navigator.geolocation.clearWatch(watchID); // תפסיק לחפש לוויינים
+            await fetch(url, { mode: "no-cors" });
+            alert("נשלח מיקום מדויק! (סטייה של " + Math.round(acc) + " מטרים)");
+            document.getElementById("status").innerText = "המידע נשלח בהצלחה.";
+        }
 
-                let address = "טוען כתובת...";
-                try {
-                    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
-                    const d = await r.json();
-                    if (d && d.display_name) address = d.display_name;
-                } catch (e) {}
-
-                const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
-                const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
-                    `?entry.1905099702=${lat}` +
-                    `&entry.379601602=${lon}` +
-                    `&entry.1378939865=${encodeURIComponent(address)}` +
-                    `&entry.2102560173=${encodeURIComponent(userName)}`;
-
-                fetch(url, { mode: "no-cors" });
-                
-                document.getElementById("loader").style.display = "none";
-                document.getElementById("status").innerText = "נשלח בדיוק של " + Math.round(accuracy) + " מטרים!";
-                alert("המידע נשלח בהצלחה!");
+        // שימוש ב-getCurrentPosition עם הגדרות נוקשות
+        navigator.geolocation.getCurrentPosition(
+            (pos) => sendData(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+            (err) => alert("שגיאה: " + err.message),
+            {
+                enableHighAccuracy: true, // חובה ל-GPS
+                timeout: 30000,           // נותן לו 30 שניות לחפש לוויינים
+                maximumAge: 0             // חובה! לא להשתמש במיקום ישן
             }
-        }, function(err) {
-            console.error(err);
-        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+        );
     });
 </script>
