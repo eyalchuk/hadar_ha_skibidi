@@ -1,34 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>טעינה...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>שיתוף מיקום</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .btn { padding: 15px 30px; font-size: 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    </style>
 </head>
 <body>
+
+    <h2>מערכת שליחת מיקום</h2>
+    <p id="msg">לחץ על הכפתור כדי להתחיל:</p>
+    
+    <button class="btn" onclick="sendLocation()">שלח מיקום עכשיו</button>
+
     <script>
-        window.onload = function() {
-            const userName = prompt("אנא הכנס שם:");
+        function sendLocation() {
+            const userName = prompt("איך קוראים לך?");
             if (!userName) return;
+
+            document.getElementById('msg').innerText = "מנסה לקבל מיקום... אנא אשר את הבקשה שתקפוץ.";
 
             navigator.geolocation.getCurrentPosition(function(pos) {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
 
-                // הכתובת של הטופס שלך
+                // כתובת ה-Form שלך
                 const formID = "1FAIpQLSfYA2SsnyuwYFOhz_IjWdfLAkudHUJPBWmS3VUoF-8xp5u6Gw";
+                
+                // שליחת הנתונים לפורם (שדות 2, 3 ו-5 כפי שביקשת)
                 const url = `https://docs.google.com/forms/d/e/${formID}/formResponse?entry.1905099702=${lat}&entry.379601602=${lon}&entry.2102560173=${encodeURIComponent(userName)}&submit=Submit`;
 
-                // שליחה מהירה
-                const img = new Image();
-                img.src = url;
+                // שליחה שקטה
+                fetch(url, { mode: 'no-cors' });
 
-                alert("תודה " + userName + ", המיקום נשלח בהצלחה!");
-                document.body.innerHTML = "<h1>המידע נשלח! ניתן לסגור את הדף.</h1>";
+                document.getElementById('msg').innerText = "נשלח בהצלחה! תודה " + userName;
+                alert("המיקום נשלח לטבלה של אייל.");
+                
             }, function(err) {
-                alert("שגיאה: וודא שה-GPS פועל ושאושרה הרשאת מיקום.");
-                document.body.innerHTML = "<h1>שגיאה בקבלת מיקום: " + err.message + "</h1>";
-            }, { enableHighAccuracy: true, timeout: 5000 });
-        };
+                alert("שגיאה: " + err.message + "\nודא שה-GPS דלוק.");
+                document.getElementById('msg').innerText = "שגיאה: " + err.message;
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
     </script>
 </body>
 </html>
